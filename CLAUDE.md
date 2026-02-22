@@ -1,94 +1,98 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in this repository.
+Guidance for Claude Code when working in this repository.
 
-## Project Overview
+## Project: SchoolConnect Atlas
 
-This is the **Jaber-** project repository. Update this section with a description of your project once it is initialized.
+A production-grade, map-first web platform for Zambia school connectivity data.
+**Stack**: Next.js 14 + TypeScript (frontend) · FastAPI + Python (backend) · PostgreSQL + PostGIS (database) · Redis (cache) · Docker Compose.
 
 ## Repository Structure
 
 ```
-.
-├── CLAUDE.md                  # Claude Code guidance (this file)
-└── .claude/
-    ├── settings.json          # Claude Code settings and hooks
-    └── hooks/
-        └── session-start.sh   # Startup hook for remote sessions
-```
-
-## Development Setup
-
-### Prerequisites
-
-List your project's prerequisites here. For example:
-- Node.js >= 18
-- Python >= 3.10
-- Go >= 1.21
-
-### Installation
-
-```bash
-# Add your dependency installation commands here
-# e.g., npm install, pip install -r requirements.txt, etc.
+backend/        FastAPI API (Python)
+etl/            Excel → PostGIS ingestion script
+db/migrations/  SQL schema + indexes (run automatically by docker-compose)
+frontend/       Next.js 14 App Router (TypeScript)
+data/           Drop Excel workbook here (gitignored)
 ```
 
 ## Common Commands
 
-### Build
-
+### Local development (Docker)
 ```bash
-# Add your build command here
-# e.g., npm run build
+docker compose up --build -d    # Start all services
+docker compose logs -f          # Tail logs
+docker compose down             # Stop
 ```
 
-### Test
-
+### Data ingestion
 ```bash
-# Add your test command here
-# e.g., npm test, pytest, go test ./...
+# Copy workbook, then:
+make ingest FILE=/path/to/workbook.xlsx
+# Or directly:
+docker compose --profile ingest run --rm etl python ingest.py --file /data/schools.xlsx
 ```
 
-### Lint
-
+### Backend (FastAPI)
 ```bash
-# Add your lint command here
-# e.g., npm run lint, flake8 ., golangci-lint run
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload   # Dev server on :8000
+pytest tests/ -v                # Tests
+ruff check app/                 # Linter
 ```
 
-### Format
-
+### Frontend (Next.js)
 ```bash
-# Add your format command here
-# e.g., prettier --write ., black ., gofmt -w .
+cd frontend
+npm install
+npm run dev     # Dev server on :3000
+npm run build   # Production build
+npm run lint    # ESLint
 ```
 
-## Environment Variables
+### Database
+```bash
+make db-shell   # psql into the PostGIS container
+```
 
-Document any required environment variables here:
+## Key Architecture Decisions
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `EXAMPLE_VAR` | Description of variable | Yes/No |
+- **PostGIS geometry**: All points are `GEOMETRY(Point, 4326)`. All spatial queries use PostGIS functions (`ST_DWithin`, `ST_MakeEnvelope`, `ST_Distance`).
+- **Async SQLAlchemy**: Backend uses `async/await` throughout. Use `asyncpg` driver.
+- **Hub matching**: School↔hub links are resolved by fuzzy-matching `HubName` from the schools sheet against hub `site_name` and `hub_site_code`. Match type is recorded (`exact` / `fuzzy` / `unmatched`).
+- **Materialized views**: `mv_province_summary` and `mv_hub_demand` are refreshed after each ingestion run. Use `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+- **Redis caching**: Cache keys prefixed with `sca:`. Default TTL 5 minutes for lists, 5 minutes for details. Invalidate on data changes.
+- **No source data mutation**: Scenario computations return `scenario_*` derived fields; they never overwrite ingested cost columns.
+- **Theme system**: CSS custom properties at `:root` driven by `frontend/theme/tokens.ts`. Drop Envato theme CSS into `globals.css` marked section.
 
-## Code Style Guidelines
+## API Conventions
 
-- Follow the existing patterns and conventions in the codebase.
-- Write clear, descriptive commit messages.
-- Keep functions small and focused on a single responsibility.
-- Add tests for new functionality.
+- All API routes: `/api/v1/...`
+- Pagination: `?page=1&page_size=50` — response includes `{ data, total, page, page_size, pages }`
+- Geo filters: `?bbox=minLon,minLat,maxLon,maxLat` or `?near=lat,lon&radius_km=X`
+- Sorting: `?sort_by=<field>&sort_dir=asc|desc`
+- Errors: `{ "detail": "message", "code": "optional_code" }`
+- Rate limit: 60 req/min per IP (configurable via `RATE_LIMIT_PER_MINUTE`)
 
-## Branching Strategy
+## Data Model Notes
 
-- `main` / `master` — production-ready code
-- `feature/*` — new features
-- `fix/*` — bug fixes
-- `claude/*` — Claude Code automated branches
+- **Admin hierarchy**: Province → District → Constituency → Ward (in that order)
+- **HubDist columns**: `hub_dist_km` from Excel; `hub_dist_m` from Excel; `distance_m_computed` in `school_hub_links` is the PostGIS geodesic computation (derived — labelled clearly)
+- **Cost fields**: All cost columns from source Excel are stored verbatim. Scenario overrides are computed on request.
+- **QA fields**: `coord_valid` is a generated column; `hub_dist_anomaly` is set by ETL QA pass.
 
 ## Notes for Claude
 
-- Always read files before modifying them.
-- Run tests before and after making changes to verify correctness.
-- Prefer editing existing files over creating new ones.
-- Do not commit secrets, API keys, or sensitive data.
-- Follow the project's existing code style and conventions.
+- Never mutate source cost columns — label derived fields clearly.
+- When adding new API endpoints, follow the existing pattern in `backend/app/routers/`.
+- When adding map layers, add them to both `AtlasMap.tsx` and `LayerToggles.tsx`.
+- Run `ruff check app/` before committing backend changes.
+- Run `npm run lint` before committing frontend changes.
+- Spatial indexes are critical for performance — always use `ST_DWithin` with geography cast for radius queries.
+- The `mv_province_summary` and `mv_hub_demand` views must be refreshed after any data changes.
+
+## Session Start Hook
+
+Remote Claude Code sessions automatically install dependencies via `.claude/hooks/session-start.sh`.

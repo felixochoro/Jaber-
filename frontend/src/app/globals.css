@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Default theme tokens (fallback if JS hasn't loaded) ─────────────────── */
+:root {
+  --color-brand-50:  #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+
+  --color-surface:         #ffffff;
+  --color-surface-raised:  #f8fafc;
+  --color-surface-overlay: #f1f5f9;
+  --color-text-primary:    #0f172a;
+  --color-text-secondary:  #475569;
+  --color-text-muted:      #94a3b8;
+  --color-border:          #e2e8f0;
+  --color-border-subtle:   #f1f5f9;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-card: 0.75rem;
+  --radius-btn:  0.5rem;
+  --spacing-panel: 1.5rem;
+
+  --shadow-card:    0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-panel:   0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  --shadow-tooltip: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+/* ── Mapbox overrides ────────────────────────────────────────────────────── */
+.mapboxgl-ctrl-logo { display: none !important; }
+.mapboxgl-popup-content {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-tooltip);
+  padding: 0.75rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+.panel-card {
+  @apply bg-white rounded-[var(--radius-card)] shadow-[var(--shadow-card)]
+         border border-[var(--color-border)] p-4;
+}
+
+.stat-card {
+  @apply panel-card flex flex-col gap-1;
+}
+
+/* ── Envato theme injection point ─────────────────────────────────────────── */
+/* Place your Envato theme CSS imports or overrides below this line */
+/* ──────────────────────────────────────────────────────────────── */
