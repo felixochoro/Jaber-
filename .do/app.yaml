@@ -1,0 +1,106 @@
+spec_version: 2
+name: schoolconnect-atlas
+region: nyc
+
+# ── Managed Databases ─────────────────────────────────────────────────────────
+# NOTE: After first deploy, enable PostGIS on the managed database:
+#   doctl databases db get <db-id> --no-header
+#   psql "<connection-string>" -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;"
+# OR: the backend's start.sh migration scripts will attempt this automatically.
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-1vcpu-1gb
+    num_nodes: 1
+
+  - name: cache
+    engine: REDIS
+    version: "7"
+    size: db-s-1vcpu-1gb
+    eviction_policy: allkeys_lru
+
+# ── Services ──────────────────────────────────────────────────────────────────
+services:
+
+  # --- FastAPI backend ---------------------------------------------------------
+  - name: backend
+    github:
+      repo: felixochoro/Jaber-
+      branch: main
+      deploy_on_push: true
+    source_dir: backend
+    dockerfile_path: Dockerfile
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 8000
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      # Injected automatically by App Platform from the managed database
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+        scope: RUN_TIME
+      - key: REDIS_URL
+        value: ${cache.REDIS_URL}
+        scope: RUN_TIME
+      # Secrets — replace CHANGE_ME values before running deploy.sh --create
+      - key: SECRET_KEY
+        value: CHANGE_ME
+        type: SECRET
+        scope: RUN_TIME
+      - key: API_KEYS
+        value: CHANGE_ME
+        type: SECRET
+        scope: RUN_TIME
+      # Frontend URL injected automatically once frontend service is deployed
+      - key: CORS_ORIGINS
+        value: ${frontend.PUBLIC_URL}
+        scope: RUN_TIME
+      - key: ENVIRONMENT
+        value: production
+        scope: RUN_TIME
+      - key: LOG_LEVEL
+        value: info
+        scope: RUN_TIME
+      - key: WORKERS
+        value: "2"
+        scope: RUN_TIME
+
+  # --- Next.js frontend --------------------------------------------------------
+  - name: frontend
+    github:
+      repo: felixochoro/Jaber-
+      branch: main
+      deploy_on_push: true
+    source_dir: frontend
+    dockerfile_path: Dockerfile
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 3000
+    health_check:
+      http_path: /
+      initial_delay_seconds: 60
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      # Backend URL is baked into the Next.js bundle at build time (NEXT_PUBLIC_*)
+      # and also available at runtime for the Next.js rewrite proxy.
+      - key: NEXT_PUBLIC_API_URL
+        value: ${backend.PUBLIC_URL}
+        scope: RUN_AND_BUILD_TIME
+      - key: NEXT_PUBLIC_APP_NAME
+        value: SchoolConnect Atlas
+        scope: RUN_AND_BUILD_TIME
+      # Secret — replace CHANGE_ME before running deploy.sh --create
+      - key: NEXT_PUBLIC_MAPBOX_TOKEN
+        value: CHANGE_ME
+        type: SECRET
+        scope: RUN_AND_BUILD_TIME
